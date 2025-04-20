@@ -1,0 +1,1 @@
+pyinstaller main.py --onefile --icon="C:\Users\Yohann\Desktop\oracle.ico"
