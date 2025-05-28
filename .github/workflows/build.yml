@@ -1,0 +1,86 @@
+name: Build Nuitka Executables
+
+on:
+  workflow_dispatch:
+
+jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.set_version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Get latest tag and bump version
+        id: set_version
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const tags = await github.rest.repos.listTags({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              per_page: 100
+            });
+
+            function bumpVersion(tag) {
+              const parts = tag.replace(/^v/, '').split('.').map(Number);
+              if (parts.length === 3) {
+                parts[2] += 1; // patch bump
+              } else {
+                return 'v0.0.1';
+              }
+              return `v${parts.join('.')}`;
+            }
+
+            const latest = tags.data.find(t => /^v\d+\.\d+\.\d+$/.test(t.name));
+            const nextVersion = latest ? bumpVersion(latest.name) : 'v0.0.1';
+            core.setOutput('version', nextVersion);
+
+  build:
+    name: Build for All Platforms
+    needs: prepare-release
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install nuitka -r requirements.txt
+
+      - name: Build binary
+        run: |
+          name="main-${{ matrix.os }}"
+          nuitka --standalone --onefile --output-filename $name main.py
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: main-${{ matrix.os }}
+          path: main-${{ matrix.os }}
+
+  release:
+    name: Release
+    needs: [build, prepare-release]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.prepare-release.outputs.version }}
+          name: ${{ needs.prepare-release.outputs.version }}
+          files: |
+            artifacts/**/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
