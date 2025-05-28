@@ -123,7 +123,7 @@ jobs:
           path: dist/systeminfo-static-windows.exe
 
   release:
-    needs: [ build-linux-amd64, build-linux-arm64, build-windows ]
+    needs: [tag, build-linux-amd64, build-linux-arm64, build-windows]
     runs-on: ubuntu-latest
     name: Create GitHub Release
     steps:
@@ -140,6 +140,7 @@ jobs:
           files: |
             artifacts/systeminfo-linux-amd64/systeminfo-static-amd64
             artifacts/systeminfo-linux-arm64/systeminfo-static-arm64
-            artifacts/systeminfo-windows/systeminfo-static-windows.exe
+            artifacts/systeminfo-windows/systeminfo.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
