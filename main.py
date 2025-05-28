@@ -116,7 +116,7 @@ def get_network_speed(interval=1):
 
 def get_virtualization_type():
     if platform.system() != "Linux":
-        return "Unknown or Physical"
+        return "Unknown"
     try:
         if os.path.exists("/proc/1/environ"):
             with open("/proc/1/environ", 'rb') as f:
@@ -145,10 +145,45 @@ def get_virtualization_type():
     return "Physical"
 
 
-def get_os_distribution():
+def get_os_version():
     system = platform.system()
     try:
         if system == "Linux":
+            # Alpine
+            if os.path.exists("/etc/alpine-release"):
+                with open("/etc/alpine-release") as f:
+                    return f"alpine-{f.read().strip()}"
+
+            # Debian
+            if os.path.exists("/etc/debian_version"):
+                with open("/etc/debian_version") as f:
+                    version = f.read().strip()
+                    return f"debian-{version}"
+
+            # CentOS / RHEL / Rocky / AlmaLinux
+            if os.path.exists("/etc/redhat-release"):
+                with open("/etc/redhat-release") as f:
+                    line = f.read().strip().lower()
+                    parts = line.split()
+                    if len(parts) >= 4:
+                        name = parts[0]
+                        version = parts[3]
+                        return f"{name.replace('linux', '').strip()}-{version}"
+
+            # Ubuntu / Linux Mint
+            if os.path.exists("/etc/lsb-release"):
+                distro = ""
+                version = ""
+                with open("/etc/lsb-release") as f:
+                    for line in f:
+                        if line.startswith("DISTRIB_ID="):
+                            distro = line.strip().split("=")[1].lower()
+                        if line.startswith("DISTRIB_RELEASE="):
+                            version = line.strip().split("=")[1]
+                    if distro and version:
+                        return f"{distro}-{version}"
+
+            # 通用 fallback：/etc/os-release
             if os.path.exists("/etc/os-release"):
                 info = {}
                 with open("/etc/os-release") as f:
@@ -158,15 +193,23 @@ def get_os_distribution():
                             info[key] = value.strip('"')
                 os_id = info.get("ID", "")
                 version = info.get("VERSION_ID", "")
-                return f"{os_id}-{version}" if os_id and version else info.get("PRETTY_NAME", "Unknown")
+                if os_id and version:
+                    return f"{os_id}-{version}"
+                elif "PRETTY_NAME" in info:
+                    return info["PRETTY_NAME"]
+
         elif system == "Darwin":
-            return subprocess.check_output(["sw_vers", "-productVersion"], text=True).strip()
+            return f"macos-{subprocess.check_output(['sw_vers', '-productVersion'], text=True).strip()}"
+
         elif system == "Windows":
-            return platform.platform()
+            return f"windows-{platform.platform()}"
+
         elif system == "FreeBSD":
-            return subprocess.check_output(["freebsd-version"], text=True).strip()
+            return f"freebsd-{subprocess.check_output(['freebsd-version'], text=True).strip()}"
+
     except Exception as e:
         return f"Unknown ({e})"
+
     return "Unknown"
 
 
@@ -181,7 +224,7 @@ def get_system_info():
     return {
         "platform": platform.system(),
         "platform_version": platform.version(),
-        "distribution": get_os_distribution(),
+        "distribution": get_os_version(),
         "virtualization": get_virtualization_type(),
         "architecture": platform.machine(),
         "cpu": {
