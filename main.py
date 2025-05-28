@@ -220,6 +220,7 @@ def get_system_info():
     now = datetime.now()
     uptime = now - boot_time
     upload, download = get_network_speed()
+    swap = psutil.swap_memory()
 
     return {
         "platform": platform.system(),
@@ -236,6 +237,11 @@ def get_system_info():
             "total": format_bytes(psutil.virtual_memory().total),
             "used": format_bytes(psutil.virtual_memory().used),
             "percent": psutil.virtual_memory().percent
+        },
+        "swap": {
+            "total": format_bytes(swap.total),
+            "used": format_bytes(swap.used),
+            "percent": round(swap.percent, 2)
         },
         "disk": get_disk_usage(),
         "network": {
