@@ -59,13 +59,13 @@ jobs:
       - name: Build Executable
         run: |
           pyinstaller --onefile --name systeminfo main.py
-          staticx dist/systeminfo dist/systeminfo-static-amd64
-          strip dist/systeminfo-static-amd64
+          staticx dist/systeminfo dist/oci-agent-amd64
+          strip dist/oci-agent-amd64
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: systeminfo-linux-amd64
-          path: dist/systeminfo-static-amd64
+          path: dist/oci-agent-amd64
 
   build-linux-arm64:
     needs: tag
@@ -92,13 +92,13 @@ jobs:
 
       - name: Rename output binary for ARM64
         run: |
-          mv ./output/systeminfo ./output/systeminfo-static-arm64
+          mv ./output/systeminfo ./output/oci-agent-arm64
 
       - name: Upload ARM64 binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: systeminfo-linux-arm64
-          path: ./output/systeminfo-static-arm64  # 你的 Dockerfile 里产出的可执行文件路径，调整这里
+          path: ./output/oci-agent-arm64  # 你的 Dockerfile 里产出的可执行文件路径，调整这里
 
   build-windows:
     needs: tag
@@ -114,13 +114,13 @@ jobs:
         run: pyinstaller --onefile --name systeminfo.exe main.py
 
       - name: Rename output binary for Windows
-        run: ren dist\systeminfo.exe systeminfo-static-windows.exe
+        run: ren dist\systeminfo.exe oci-agent-windows.exe
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: systeminfo-windows
-          path: dist/systeminfo-static-windows.exe
+          path: dist/oci-agent-windows.exe
 
   release:
     needs: [tag, build-linux-amd64, build-linux-arm64, build-windows]
@@ -138,9 +138,9 @@ jobs:
           tag_name: ${{ needs.tag.outputs.version }}
           name: Release ${{ needs.tag.outputs.version }}
           files: |
-            artifacts/systeminfo-linux-amd64/systeminfo-static-amd64
-            artifacts/systeminfo-linux-arm64/systeminfo-static-arm64
-            artifacts/systeminfo-windows/systeminfo-static-windows.exe
+            artifacts/systeminfo-linux-amd64/oci-agent-amd64
+            artifacts/systeminfo-linux-arm64/oci-agent-arm64
+            artifacts/systeminfo-windows/oci-agent-windows.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

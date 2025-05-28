@@ -37,11 +37,32 @@ def format_uptime(uptime_timedelta):
 def get_cpu_model():
     system = platform.system()
     try:
-        if system == "Linux" or system == "FreeBSD":
-            with open("/proc/cpuinfo", "r") as f:
-                for line in f:
-                    if "model name" in line:
-                        return line.strip().split(":")[1].strip()
+        if system in ("Linux", "FreeBSD"):
+            # 尝试从 lscpu 获取
+            try:
+                output = subprocess.check_output(["lscpu"], text=True)
+                for line in output.splitlines():
+                    if "Model name" in line:
+                        return line.split(":", 1)[1].strip()
+                    if "Architecture" in line and "ARM" in line:
+                        return platform.processor() or "ARM CPU"
+            except Exception:
+                pass
+
+            # 尝试从 /proc/cpuinfo 获取 ARM 信息
+            with open("/proc/cpuinfo") as f:
+                lines = f.readlines()
+
+            implementer = part = None
+            for line in lines:
+                if "CPU implementer" in line:
+                    implementer = line.strip().split(":")[1].strip()
+                elif "CPU part" in line:
+                    part = line.strip().split(":")[1].strip()
+
+            if implementer and part:
+                return f"ARM CPU (implementer: {implementer}, part: {part})"
+
         elif system == "Darwin":
             return subprocess.check_output(["sysctl", "-n", "machdep.cpu.brand_string"], text=True).strip()
         elif system == "Windows":
