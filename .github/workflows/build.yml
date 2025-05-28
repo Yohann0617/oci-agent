@@ -59,13 +59,13 @@ jobs:
       - name: Build Executable
         run: |
           pyinstaller --onefile --name systeminfo main.py
-          staticx dist/systeminfo dist/systeminfo-static
-          strip dist/systeminfo-static
+          staticx dist/systeminfo dist/systeminfo-static-amd64
+          strip dist/systeminfo-static-amd64
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: systeminfo-linux-amd64
-          path: dist/systeminfo-static
+          path: dist/systeminfo-static-amd64
 
   build-linux-arm64:
     needs: tag
@@ -90,11 +90,15 @@ jobs:
             --tag myimage:arm64 \
             .
 
+      - name: Rename output binary for ARM64
+        run: |
+          mv ./output/systeminfo ./output/systeminfo-static-arm64
+
       - name: Upload ARM64 binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: systeminfo-linux-arm64
-          path: ./output/systeminfo  # 你的 Dockerfile 里产出的可执行文件路径，调整这里
+          path: ./output/systeminfo-static-arm64  # 你的 Dockerfile 里产出的可执行文件路径，调整这里
 
   build-windows:
     needs: tag
@@ -104,18 +108,19 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install Python Dependencies
-        run: |
-          pip install pyinstaller -r requirements.txt
+        run: pip install pyinstaller -r requirements.txt
 
       - name: Build Executable
-        run: |
-          pyinstaller --onefile --name systeminfo.exe main.py
+        run: pyinstaller --onefile --name systeminfo.exe main.py
+
+      - name: Rename output binary for Windows
+        run: ren dist\systeminfo.exe systeminfo-static-windows.exe
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
           name: systeminfo-windows
-          path: dist/systeminfo.exe
+          path: dist/systeminfo-static-windows.exe
 
   release:
     needs: [ build-linux-amd64, build-linux-arm64, build-windows ]
@@ -133,8 +138,8 @@ jobs:
           tag_name: ${{ needs.tag.outputs.version }}
           name: Release ${{ needs.tag.outputs.version }}
           files: |
-            artifacts/systeminfo-linux-amd64/systeminfo-static
-            artifacts/systeminfo-linux-arm64/systeminfo-static
-            artifacts/systeminfo-windows/systeminfo.exe
+            artifacts/systeminfo-linux-amd64/systeminfo-static-amd64
+            artifacts/systeminfo-linux-arm64/systeminfo-static-arm64
+            artifacts/systeminfo-windows/systeminfo-static-windows.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
