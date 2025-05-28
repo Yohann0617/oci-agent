@@ -69,25 +69,32 @@ jobs:
 
   build-linux-arm64:
     needs: tag
-    runs-on: ubuntu-22.04-arm64  # 官方 arm64 runner
-    name: Build Linux arm64
+    runs-on: ubuntu-latest  # 用默认 amd64 runner，也支持 buildx 跨平台构建
+    name: Build Linux arm64 with Docker Buildx
     steps:
       - uses: actions/checkout@v4
-      - name: Install Dependencies
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: arm64
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build for linux/arm64 and export binary
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential python3-pip upx patchelf curl
-          pip install pyinstaller staticx -r requirements.txt
-      - name: Build Executable
-        run: |
-          pyinstaller --onefile --name systeminfo main.py
-          staticx dist/systeminfo dist/systeminfo-static
-          strip dist/systeminfo-static
-      - name: Upload Artifact
+          docker buildx build \
+            --platform linux/arm64 \
+            --output type=local,dest=./output \
+            --tag myimage:arm64 \
+            .
+
+      - name: Upload ARM64 binary artifact
         uses: actions/upload-artifact@v4
         with:
           name: systeminfo-linux-arm64
-          path: dist/systeminfo-static
+          path: ./output/systeminfo  # 你的 Dockerfile 里产出的可执行文件路径，调整这里
 
   build-windows:
     needs: tag
@@ -111,7 +118,7 @@ jobs:
           path: dist/systeminfo.exe
 
   release:
-    needs: [build-linux-amd64, build-linux-arm64, build-windows]
+    needs: [ build-linux-amd64, build-linux-arm64, build-windows ]
     runs-on: ubuntu-latest
     name: Create GitHub Release
     steps:
@@ -128,6 +135,6 @@ jobs:
           files: |
             artifacts/systeminfo-linux-amd64/systeminfo-static
             artifacts/systeminfo-linux-arm64/systeminfo-static
-            artifacts/systeminfo-windows-amd64/systeminfo.exe
+            artifacts/systeminfo-windows/systeminfo.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
