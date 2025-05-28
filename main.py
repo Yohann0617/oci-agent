@@ -120,6 +120,7 @@ def get_network_speed(interval=1):
 
     return upload_speed, download_speed
 
+
 # 汇总所有盘的磁盘使用情况
 def get_total_disk_usage():
     total = 0
@@ -147,6 +148,128 @@ def get_total_disk_usage():
         "percent": round(percent, 1)
     }
 
+
+# 获取 Linux 发行版以及版本号（如 debian-12.7）
+def get_detailed_os_version():
+    try:
+        # Alpine
+        if os.path.exists("/etc/alpine-release"):
+            with open("/etc/alpine-release") as f:
+                return f"alpine-{f.read().strip()}"
+
+        # Debian
+        if os.path.exists("/etc/debian_version"):
+            with open("/etc/debian_version") as f:
+                version = f.read().strip()
+                return f"debian-{version}"
+
+        # CentOS / RHEL / Rocky / AlmaLinux 等基于 RHEL 的系统
+        if os.path.exists("/etc/redhat-release"):
+            with open("/etc/redhat-release") as f:
+                # 例如：CentOS Linux release 7.9.2009 (Core)
+                line = f.read().strip().lower()
+                parts = line.split()
+                # parts[0] 为 centos/red hat 等，parts[3] 为版本号
+                if len(parts) >= 4:
+                    name = parts[0]
+                    version = parts[3]
+                    return f"{name}-{version}".replace("linux", "").strip("-")
+
+        # Ubuntu / Linux Mint 等基于 lsb-release 的系统
+        if os.path.exists("/etc/lsb-release"):
+            distro = ""
+            version = ""
+            with open("/etc/lsb-release") as f:
+                for line in f:
+                    if line.startswith("DISTRIB_ID="):
+                        distro = line.strip().split("=")[1].lower()
+                    if line.startswith("DISTRIB_RELEASE="):
+                        version = line.strip().split("=")[1]
+                if distro and version:
+                    return f"{distro}-{version}"
+
+        # 通用 fallback：/etc/os-release
+        if os.path.exists("/etc/os-release"):
+            info = {}
+            with open("/etc/os-release") as f:
+                for line in f:
+                    if "=" in line:
+                        key, value = line.strip().split("=", 1)
+                        info[key] = value.strip('"')
+            os_id = info.get("ID", "unknown")
+            version = info.get("VERSION_ID", "")
+            if os_id and version:
+                return f"{os_id}-{version}"
+            elif "PRETTY_NAME" in info:
+                return info["PRETTY_NAME"]
+
+    except Exception as e:
+        return f"Unknown ({e})"
+
+    return "Unknown"
+
+
+# 获取虚拟化环境类型（KVM、LXC、VMware、Xen 等）
+def get_virtualization_type():
+    try:
+        if os.path.exists("/proc/1/environ"):
+            with open("/proc/1/environ", 'rb') as f:
+                env = f.read()
+            if b'lxc' in env or b'container=lxc' in env:
+                return "LXC"
+            if b'docker' in env or b'container=docker' in env:
+                return "Docker"
+
+        # systemd-detect-virt 工具能检测大多数虚拟化平台
+        result = subprocess.run(["systemd-detect-virt"], capture_output=True, text=True)
+        if result.returncode == 0:
+            output = result.stdout.strip()
+            if output != "none":
+                return output.upper()
+
+        # 尝试从 CPU 信息中推测
+        with open("/proc/cpuinfo") as f:
+            cpuinfo = f.read().lower()
+            if "kvm" in cpuinfo:
+                return "KVM"
+            elif "vmware" in cpuinfo:
+                return "VMware"
+            elif "xen" in cpuinfo:
+                return "Xen"
+
+    except Exception as e:
+        return f"Unknown ({e})"
+
+    return "Physical"
+
+
+def format_bytes(size):
+    units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
+    i = 0
+    while size >= 1024 and i < len(units) - 1:
+        size /= 1024.0
+        i += 1
+
+    if units[i] == 'B':
+        return f"{int(size)}{units[i]}"
+    elif size == int(size):
+        return f"{int(size)}{units[i]}"
+    else:
+        return f"{size:.2f}{units[i]}"
+
+
+def format_uptime(uptime_timedelta):
+    days = uptime_timedelta.days
+    if days >= 1:
+        return f"{days}天"
+    else:
+        total_seconds = int(uptime_timedelta.total_seconds())
+        hours = total_seconds // 3600
+        minutes = (total_seconds % 3600) // 60
+        seconds = total_seconds % 60
+        return f"{hours:02}:{minutes:02}:{seconds:02}"
+
+
 # 获取系统信息总览
 def get_system_info():
     up_speed, down_speed = get_network_speed()
@@ -158,6 +281,8 @@ def get_system_info():
     return {
         "platform": platform.system(),
         "platform_version": platform.version(),
+        "distribution": get_detailed_os_version(),
+        "virtualization": get_virtualization_type(),
         "architecture": platform.machine(),
         "cpu": {
             "model": get_cpu_model(),
@@ -188,33 +313,6 @@ def get_system_info():
             "udp": len([c for c in psutil.net_connections() if c.type == socket.SOCK_DGRAM]),
         }
     }
-
-
-def format_bytes(size):
-    units = ['B', 'KB', 'MB', 'GB', 'TB', 'PB']
-    i = 0
-    while size >= 1024 and i < len(units) - 1:
-        size /= 1024.0
-        i += 1
-
-    if units[i] == 'B':
-        return f"{int(size)}{units[i]}"
-    elif size == int(size):
-        return f"{int(size)}{units[i]}"
-    else:
-        return f"{size:.2f}{units[i]}"
-
-
-def format_uptime(uptime_timedelta):
-    days = uptime_timedelta.days
-    if days >= 1:
-        return f"{days}天"
-    else:
-        total_seconds = int(uptime_timedelta.total_seconds())
-        hours = total_seconds // 3600
-        minutes = (total_seconds % 3600) // 60
-        seconds = total_seconds % 60
-        return f"{hours:02}:{minutes:02}:{seconds:02}"
 
 
 # 上报数据到Java服务端
@@ -258,6 +356,6 @@ if __name__ == "__main__":
     json_str = json.dumps(get_system_info())
     print(json_str)
 
-    # while True:
-    #     up, down = get_network_speed()
-    #     print(f"Upload: {up:.2f} B/s, Download: {down:.2f} B/s")
+    while True:
+        up, down = get_network_speed()
+        print(f"Upload: {format_bytes(up)}, Download: {format_bytes(down)}")
