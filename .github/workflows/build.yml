@@ -1,14 +1,49 @@
 name: Build Static Executables
 
 on:
-  push: # 每次推送（包括提交代码）都会触发
+  push:
     branches:
-      - master    # 仅 master 分支触发（可改为其他分支或删除表示全部分支）
-    tags:
-      - 'v*'  # 如 v1.0.0
+      - master  # 可改为 main 或其他主分支
+  workflow_dispatch:  # 手动触发也支持
 
 jobs:
+  tag:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.tag.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get Next Version Tag
+        id: tag
+        run: |
+          git fetch --tags
+          latest=$(git tag | grep '^v' | sort -V | tail -n1)
+          echo "Latest tag: $latest"
+
+          if [[ "$latest" == "" ]]; then
+            version="v1.0.0"
+          else
+            IFS='.' read -ra parts <<< "${latest#v}"
+            major=${parts[0]}
+            minor=${parts[1]}
+            patch=${parts[2]}
+            patch=$((patch+1))
+            version="v$major.$minor.$patch"
+          fi
+
+          echo "New version: $version"
+          echo "version=$version" >> $GITHUB_OUTPUT
+
+      - name: Create Git Tag
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git tag ${{ steps.tag.outputs.version }}
+          git push origin ${{ steps.tag.outputs.version }}
+
   build-linux:
+    needs: tag
     runs-on: ubuntu-latest
     name: Build on Linux
     steps:
@@ -20,12 +55,9 @@ jobs:
           sudo apt-get install -y build-essential python3-pip upx patchelf curl
           pip install pyinstaller staticx -r requirements.txt
 
-      - name: Build Executable with PyInstaller
+      - name: Build Executable
         run: |
           pyinstaller --onefile --name systeminfo main.py
-
-      - name: Make Executable Static with staticx
-        run: |
           staticx dist/systeminfo dist/systeminfo-static
           strip dist/systeminfo-static
 
@@ -36,6 +68,7 @@ jobs:
           path: dist/systeminfo-static
 
   build-windows:
+    needs: tag
     runs-on: windows-latest
     name: Build on Windows
     steps:
@@ -56,8 +89,9 @@ jobs:
           path: dist/systeminfo.exe
 
   release:
-    needs: [ build-linux, build-windows ]
+    needs: [build-linux, build-windows, tag]
     runs-on: ubuntu-latest
+    name: Create GitHub Release
     steps:
       - name: Download Artifacts
         uses: actions/download-artifact@v4
@@ -67,6 +101,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.tag.outputs.version }}
+          name: Release ${{ needs.tag.outputs.version }}
           files: |
             artifacts/systeminfo-linux/systeminfo-static
             artifacts/systeminfo-windows/systeminfo.exe
