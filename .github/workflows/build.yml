@@ -41,7 +41,7 @@ jobs:
     needs: prepare-release
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        os: [ ubuntu-latest, windows-latest ]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v3
@@ -58,9 +58,9 @@ jobs:
 
       - name: Build binary
         run: |
-          name="main-${{ matrix.os }}"
-          nuitka --standalone --onefile --output-filename $name main.py
-
+          NAME=main-${{ matrix.os }}
+          nuitka --standalone --onefile --output-filename=$NAME main.py
+        shell: bash
       - uses: actions/upload-artifact@v4
         with:
           name: main-${{ matrix.os }}
@@ -68,7 +68,7 @@ jobs:
 
   release:
     name: Release
-    needs: [build, prepare-release]
+    needs: [ build, prepare-release ]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
