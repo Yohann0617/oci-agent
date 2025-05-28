@@ -140,7 +140,7 @@ jobs:
           files: |
             artifacts/systeminfo-linux-amd64/systeminfo-static-amd64
             artifacts/systeminfo-linux-arm64/systeminfo-static-arm64
-            artifacts/systeminfo-windows/systeminfo.exe
+            artifacts/systeminfo-windows/systeminfo-static-windows.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
