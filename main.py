@@ -101,7 +101,7 @@ def get_disk_usage():
     return {
         "total": format_bytes(total),
         "used": format_bytes(used),
-        "percent": round(percent, 1)
+        "percent": round(percent, 2)
     }
 
 
@@ -221,6 +221,7 @@ def get_system_info():
     uptime = now - boot_time
     upload, download = get_network_speed()
     swap = psutil.swap_memory()
+    flow = psutil.net_io_counters()
 
     return {
         "platform": platform.system(),
@@ -246,7 +247,9 @@ def get_system_info():
         "disk": get_disk_usage(),
         "network": {
             "upload_speed": format_bytes(upload),
-            "download_speed": format_bytes(download)
+            "download_speed": format_bytes(download),
+            "upload_total": format_bytes(flow.bytes_sent),
+            "download_total": format_bytes(flow.bytes_recv)
         },
         "load_average": get_load_average(),
         "uptime": format_uptime(uptime),
